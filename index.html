@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>单词肉鸽 · 热血拼写</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 自动存档提示 -->
+  <div id="save-indicator" class="save-indicator">💾 游戏已自动保存</div>
+
+  <!-- 标题界面 -->
+  <div id="title" class="screen on">
+    <div class="logo">LEXI<br/>ROGUE</div>
+    <div class="sub">轻肉鸽背词闯关：看中文、限时打出英文，击败怪物买 Buff，挑战 Boss！</div>
+    <div class="meta">
+      <span>最高分 <b id="best">0</b></span>
+      <span>词库 <b id="bank-label">CET-4 精选</b></span>
+      <span>学识币 <b id="scholar-coins" style="color:var(--gold);">0</b> 💰</span>
+    </div>
+    <div class="panel">
+      <select id="bank-select" title="选择词库"></select>
+      <button class="mini" id="btn-import">导入词库</button>
+      <button class="mini" id="btn-export">导出词库</button>
+      <button class="mini" id="btn-del-bank" style="display:none">删除词库</button>
+      <button class="mini" id="btn-help">格式说明</button>
+      <button class="mini" id="btn-talents" style="background:linear-gradient(#7a1d5a,#4a0d36);border-color:#ff7adb;color:#ffb8ee;">🏛️ 学识祭坛</button>
+      <button class="mini" id="btn-settings">⚙️ 设置</button>
+    </div>
+    <div class="meta" id="book-meta" style="display:none">
+      <span>错题本 <b id="book-count">0</b> 词</span>
+      <span>今日待复习 <b id="due-count">0</b></span>
+      <span>已掌握 <b id="mastered-count">0</b></span>
+    </div>
+    <button id="btn-continue" style="display:none;background:linear-gradient(#2d7a3a,#164a20);border-color:#7aff9a;color:#7aff9a;">继续游戏</button>
+    <button id="btn-start">开始闯关</button>
+    <button id="btn-review" style="display:none">复习模式（错题本）</button>
+    <p class="sub">操作：直接打字，Enter 提交，Backspace 删除。每 4 题进商店，金币可多选加成！</p>
+    <input type="file" id="file-input" accept=".txt,.json,.csv" style="display:none" />
+  </div>
+
+  <!-- 战斗游戏界面 -->
+  <div id="game" class="screen">
+    <div class="hud">
+      <div class="stat"><span id="round-label">回合 1/8</span> · 目标 <span id="goal">400</span></div>
+      <div class="hearts" id="hp">❤❤❤❤❤</div>
+      <div class="stat" style="text-align:right">分数 <span id="score">0</span> · 金币 <span id="gold">0</span></div>
+    </div>
+    <div class="arena">
+      <div class="round-tag" id="tag">普通关</div>
+      <div class="combo" id="combo">COMBO 0</div>
+      <div class="monster">
+        <div class="sprite" id="sprite">👾</div>
+        <div id="mname">生词史莱姆</div>
+        <div class="hpbar"><i id="mhp"></i></div>
+      </div>
+      <div class="prompt">
+        <div><span class="zh" id="zh">放弃</span><span class="pos" id="pos">v.</span></div>
+        <div class="hint" id="hint"></div>
+      </div>
+      <div class="typed" id="typed"></div>
+      <div class="timer"><i id="bar"></i></div>
+      <div class="log" id="log">看中文，拼出英文单词</div>
+      <div class="fx" id="fx"></div>
+    </div>
+    <div class="deck" id="buffs"></div>
+    <input id="keys" class="hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  </div>
+
+  <!-- 真实货架商店界面 -->
+  <div id="shop" class="screen">
+    <div class="logo" style="font-size:24px">🏪 BUFF 货架商店</div>
+    <div class="sub">
+      当前持有金币：<b id="shop-gold" style="color:var(--gold);font-size:22px;">0</b> 💰
+    </div>
+    <div id="shop-notice" class="shop-notice" style="display:none;"></div>
+    <div class="cards" id="cards"></div>
+    <div class="shop-actions">
+      <button class="ghost" id="btn-reroll-shop">🎲 刷新货架（15💰）</button>
+      <button id="btn-leave-shop">🚪 离开商店（继续冒险）</button>
+    </div>
+  </div>
+
+  <!-- 结算界面 -->
+  <div id="over" class="screen">
+    <div class="logo" style="font-size:26px" id="end-title">结算</div>
+    <div class="sub" id="end-sub"></div>
+    <div class="arena over" style="margin-top:12px">
+      <div>分数 <b id="end-score">0</b> · 最高连击 <b id="end-combo">0</b> · 答对 <b id="end-ok">0</b></div>
+      <div style="margin-top:10px;padding:8px 0;border-top:1px dashed rgba(255,210,122,0.3);color:var(--gold);font-size:18px;">
+        🏛️ 学识金币存入：<b>+<span id="end-coins">0</span></b> 💰（永久金币总计：<b id="end-total-coins">0</b> 💰）
+      </div>
+      <div class="log" id="miss"></div>
+    </div>
+    <button id="btn-again" style="margin-top:18px">再来一局</button>
+  </div>
+
+  <!-- 学识祭坛（局外天赋树界面） -->
+  <div id="talents" class="screen">
+    <div class="talents-panel">
+      <div class="talents-header">
+        <h2>🏛️ 学识祭坛 · 永久天赋</h2>
+        <div class="talents-coins-display">
+          可用学识币：<b id="talents-coins-val" style="color:var(--gold);font-size:22px;">0</b> 💰
+        </div>
+      </div>
+      <p class="sub" style="font-size:15px;margin:4px 0 16px;text-align:left;">
+        每局游戏通关或倒下时，当局金币将 100% 存入祭坛。升级天赋可在后续所有游戏中永久生效！
+      </p>
+      <div class="talents-grid" id="talents-grid"></div>
+      <div class="talents-bottom-bar">
+        <button class="ghost mini" id="btn-reset-talents">🔄 重置天赋（100%全额返还）</button>
+        <button id="btn-back-talents">返回主菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置界面 -->
+  <div id="settings" class="screen">
+    <div class="settings-panel">
+      <h2>⚙️ 游戏设置</h2>
+      <div id="settings-content"></div>
+      <button id="btn-back-settings" style="margin-top:20px;width:100%">返回主菜单</button>
+    </div>
+  </div>
+
+  <!-- 模块化脚本加载 -->
+  <script src="js/config.js"></script>
+  <script src="js/talents.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/talents-panel.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
