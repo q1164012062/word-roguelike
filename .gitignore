@@ -8,5 +8,11 @@ __pycache__/
 Thumbs.db
 Desktop.ini
 
+# App runtime profiles and build caches
+.app_profile/
+build/
+*.spec
+*.exe
+
 # Local backup / dev files
 index_backup.html
