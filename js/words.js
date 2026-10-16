@@ -16,13 +16,35 @@ const WordBank = {
   active: 'builtin_cet4', // 当前选中的词库 ID 或名称
   book: {},            // 错题本
   
+  // 本地文件读取辅助函数（支持 fetch 与 XHR 双保险离线读取）
+  async _loadFile(path) {
+    try {
+      const resp = await fetch(path);
+      if (resp && resp.ok) return await resp.json();
+    } catch (_) {}
+
+    return new Promise((resolve) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', path, true);
+        xhr.onload = () => {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch (_) { resolve({ words: [] }); }
+        };
+        xhr.onerror = () => resolve({ words: [] });
+        xhr.send();
+      } catch (_) {
+        resolve({ words: [] });
+      }
+    });
+  },
+
   // 从 JSON 文件加载内置词库
   async init() {
     for (const [key, info] of Object.entries(this.BUILTIN_BANKS)) {
       try {
-        const resp = await fetch(info.file);
-        const data = await resp.json();
-        info.words = data.words || [];
+        const data = await this._loadFile(info.file);
+        info.words = (data && data.words) ? data.words : [];
       } catch (e) {
         console.warn(`加载内置词库 ${info.file} 失败`, e);
         info.words = [];

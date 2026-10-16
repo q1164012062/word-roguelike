@@ -1,95 +1,84 @@
 #!/usr/bin/env python3
-"""单词肉鸽 · 原生桌面客户端 (PyQt6 独立窗口运行，不依赖外部浏览器)"""
-import http.server
+"""
+单词肉鸽 · 100% 纯本地离线桌面客户端 (PyQt6)
+- 零网络依赖：无需启动任何本地 HTTP 服务或端口 (彻底告别 127.0.0.1:8765)
+- 免受代理干扰：即便在公司内网、企业专网或开启全局 VPN/代理的情况下也能秒开运行
+- 完全脱离外部浏览器：直接通过内嵌 Qt 引擎加载本地磁盘文件
+"""
 import os
-import socketserver
 import sys
-import threading
+
+# 必须在初始化 QApplication 之前注入 Chromium 离线与跨域参数
+sys.argv.extend([
+    "--disable-web-security",          # 允许从本地读取 data/*.json 词库
+    "--allow-file-access-from-files",   # 允许本地文件相互引用
+    "--no-proxy-server",               # 禁用任何系统/公司网络代理，杜绝内网拦截
+    "--disable-features=IsolateOrigins,site-per-process",
+])
+
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWidgets import QApplication, QMainWindow
 
 if getattr(sys, "frozen", False):
-    exe_dir = os.path.dirname(sys.executable)
-    if os.path.isfile(os.path.join(exe_dir, "index.html")):
-        ROOT = exe_dir
-    elif hasattr(sys, "_MEIPASS"):
-        ROOT = sys._MEIPASS
-    else:
-        ROOT = exe_dir
+    ROOT = os.path.dirname(sys.executable)
 else:
     ROOT = os.path.dirname(os.path.abspath(__file__))
 
-PORT = 8765
 
+class MainWindow(QMainWindow):
+    def __init__(self, html_path):
+        super().__init__()
+        self.setWindowTitle("单词肉鸽 · 热血拼写 (LexiRogue)")
+        self.resize(1220, 860)
 
-class QuietHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=ROOT, **kwargs)
+        # 尝试设置应用图标
+        icon_path = os.path.join(ROOT, "favicon.ico")
+        if os.path.isfile(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
-    def log_message(self, format, *args):
-        pass
+        # 配置专属本地持久化存储（保存最高分、学识币与天赋）
+        storage_dir = os.path.join(ROOT, ".app_storage")
+        os.makedirs(storage_dir, exist_ok=True)
+        profile = QWebEngineProfile.defaultProfile()
+        profile.setPersistentStoragePath(storage_dir)
 
+        # 初始化 Web 视图并开启本地文件权限
+        self.view = QWebEngineView(self)
+        settings = self.view.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
 
-def start_local_server():
-    try:
-        httpd = socketserver.TCPServer(("127.0.0.1", PORT), QuietHandler)
-        t = threading.Thread(target=httpd.serve_forever, daemon=True)
-        t.start()
-        return httpd
-    except OSError:
-        return None  # 端口已占用说明已有实例运行
+        # 核心：直接加载磁盘本地文件，绝不经过 127.0.0.1 网络层
+        self.view.load(QUrl.fromLocalFile(html_path))
+        self.setCentralWidget(self.view)
 
 
 def main():
     os.chdir(ROOT)
-    httpd = start_local_server()
+    html_path = os.path.join(ROOT, "index.html")
+    if not os.path.isfile(html_path):
+        print(f"错误: 找不到核心游戏文件: {html_path}")
+        return
 
-    # 尝试使用 PyQt6 内嵌引擎（纯原生桌面程序，零浏览器依赖）
-    try:
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtWebEngineWidgets import QWebEngineView
-        from PyQt6.QtWidgets import QApplication, QMainWindow
+    app = QApplication(sys.argv)
+    app.setApplicationName("单词肉鸽")
 
-        # 解决部分高分屏缩放
-        app = QApplication(sys.argv)
-        app.setApplicationName("单词肉鸽")
+    window = MainWindow(html_path)
 
-        window = QMainWindow()
-        window.setWindowTitle("单词肉鸽 · 热血拼写 (LexiRogue)")
-        window.resize(1220, 860)
+    # 居中显示窗口
+    screen = app.primaryScreen()
+    if screen:
+        geo = screen.geometry()
+        x = (geo.width() - 1220) // 2
+        y = (geo.height() - 860) // 2
+        window.move(max(0, x), max(0, y))
 
-        # 居中显示
-        screen = app.primaryScreen()
-        if screen:
-            geo = screen.geometry()
-            x = (geo.width() - 1220) // 2
-            y = (geo.height() - 860) // 2
-            window.move(max(0, x), max(0, y))
-
-        view = QWebEngineView(window)
-        view.setUrl(QUrl(f"http://127.0.0.1:{PORT}/"))
-        window.setCentralWidget(view)
-
-        window.show()
-        sys.exit(app.exec())
-
-    except ImportError:
-        # 降级：如果未安装 PyQt6 则使用原生窗口模式
-        import subprocess
-
-        edge = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-        if os.path.isfile(edge):
-            cmd = [
-                edge,
-                f"--app=http://127.0.0.1:{PORT}/",
-                f"--user-data-dir={os.path.join(ROOT, '.app_profile')}",
-                "--window-size=1220,860",
-            ]
-            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-            proc = subprocess.Popen(cmd, creationflags=flags)
-            proc.wait()
-        else:
-            import webbrowser
-
-            webbrowser.open(f"http://127.0.0.1:{PORT}/")
+    window.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
